@@ -1,0 +1,41 @@
+# --- Android / Gradle ---
+.gradle
+/build
+/captures
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# --- Android Studio / IntelliJ ---
+*.iml
+.idea/
+*.iws
+*.ipr
+
+# --- Kotlin ---
+*.kotlin_module
+
+# --- Java ---
+*.class
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# --- Local configuration ---
+local.properties
+*.env
+*.env.local
+
+# --- Claude Code ---
+.claude
+CLAUDE.md
+
+# --- OpenSpec ---
+openspec
