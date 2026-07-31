@@ -8,7 +8,8 @@ import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 
 data class HomeUiState(
-    val title: String = "Home"
+    val isConnected: Boolean = true,
+    val inputText: String = ""
 )
 
 @HiltViewModel
@@ -18,4 +19,8 @@ class HomeViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState
+
+    fun onInputTextChange(text: String) {
+        _uiState.value = _uiState.value.copy(inputText = text)
+    }
 }
