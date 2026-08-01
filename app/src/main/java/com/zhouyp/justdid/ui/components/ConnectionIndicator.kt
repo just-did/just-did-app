@@ -1,5 +1,6 @@
 package com.zhouyp.justdid.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -17,10 +18,17 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun ConnectionIndicator(
     isConnected: Boolean,
+    onDisconnectedClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = modifier,
+        modifier = modifier.then(
+            if (!isConnected && onDisconnectedClick != null) {
+                Modifier.clickable { onDisconnectedClick() }
+            } else {
+                Modifier
+            }
+        ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(

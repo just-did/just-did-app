@@ -75,6 +75,9 @@ dependencies {
     // DataStore
     implementation(libs.datastore.preferences)
 
+    // ZXing
+    implementation(libs.zxing.android.embedded)
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

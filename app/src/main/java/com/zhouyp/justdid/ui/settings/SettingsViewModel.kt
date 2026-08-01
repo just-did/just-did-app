@@ -1,10 +1,14 @@
 package com.zhouyp.justdid.ui.settings
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.zhouyp.justdid.domain.repository.ConnectionRepository
 import com.zhouyp.justdid.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
@@ -22,11 +26,26 @@ data class SettingsUiState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val connectionRepository: ConnectionRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            connectionRepository.isConnected.collect { connected ->
+                _uiState.value = _uiState.value.copy(isConnected = connected)
+            }
+        }
+    }
+
+    fun connectToMaster(url: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            connectionRepository.connectToMaster(url)
+        }
+    }
 
     fun toggleMode(mode: CalendarMode) {
         _uiState.value = _uiState.value.copy(mode = mode)

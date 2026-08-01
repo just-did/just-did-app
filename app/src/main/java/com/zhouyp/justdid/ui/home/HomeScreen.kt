@@ -1,5 +1,6 @@
 package com.zhouyp.justdid.ui.home
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,18 +20,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.zhouyp.justdid.ui.components.ConnectionIndicator
 import com.zhouyp.justdid.ui.navigation.Route
+import com.zhouyp.justdid.ui.qrcode.CustomScannerActivity
 
 @Composable
 fun HomeScreen(
@@ -38,6 +44,19 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val contents = result.contents
+        if (!contents.isNullOrEmpty()) {
+            viewModel.connectToMaster(contents)
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.lifecycle.addObserver(viewModel)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(viewModel) }
+    }
 
     Column(
         modifier = Modifier
@@ -50,7 +69,18 @@ fun HomeScreen(
                 .padding(start = 4.dp, top = 36.dp, bottom = 8.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ConnectionIndicator(isConnected = uiState.isConnected)
+            ConnectionIndicator(
+                isConnected = uiState.isConnected,
+                onDisconnectedClick = {
+                    scanLauncher.launch(ScanOptions().apply {
+                        setCaptureActivity(CustomScannerActivity::class.java)
+                        setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                        setPrompt("扫描电脑端二维码连接")
+                        setBeepEnabled(false)
+                        setOrientationLocked(true)
+                    })
+                }
+            )
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = "Just Did",

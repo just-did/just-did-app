@@ -17,6 +17,7 @@ gson = "2.11.0"
 room = "2.7.0"
 datastorePreferences = "1.1.2"
 navigationCompose = "2.8.7"
+zxingEmbedded = "4.3.0"
 
 [libraries]
 # AndroidX Core
@@ -58,6 +59,9 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 
 # DataStore
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
+
+# ZXing
+zxing-android-embedded = { group = "com.journeyapps", name = "zxing-android-embedded", version.ref = "zxingEmbedded" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

@@ -1,5 +1,6 @@
 package com.zhouyp.justdid.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -41,7 +42,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import com.zhouyp.justdid.ui.components.ConnectionIndicator
+import com.zhouyp.justdid.ui.qrcode.CustomScannerActivity
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -51,6 +55,13 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val contents = result.contents
+        if (!contents.isNullOrEmpty()) {
+            viewModel.connectToMaster(contents)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -65,7 +76,18 @@ fun SettingsScreen(
                 .padding(start = 4.dp, top = 36.dp, bottom = 8.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            ConnectionIndicator(isConnected = uiState.isConnected)
+            ConnectionIndicator(
+                isConnected = uiState.isConnected,
+                onDisconnectedClick = {
+                    scanLauncher.launch(ScanOptions().apply {
+                        setCaptureActivity(CustomScannerActivity::class.java)
+                        setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                        setPrompt("扫描电脑端二维码连接")
+                        setBeepEnabled(false)
+                        setOrientationLocked(true)
+                    })
+                }
+            )
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = "管理",
