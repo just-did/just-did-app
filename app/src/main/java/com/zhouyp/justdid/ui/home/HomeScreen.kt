@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -75,27 +76,20 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp)
                 .weight(1f)
         ) {
-            item {
+            items(uiState.todayRecords) { group ->
                 Text(
-                    text = "时间",
+                    text = group.time,
                     fontSize = 14.sp,
                     color = Color.Gray,
                     modifier = Modifier.padding(top = 8.dp)
                 )
-                Text(
-                    text = "内容",
-                    fontSize = 16.sp,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                Text(
-                    text = "时间",
-                    fontSize = 14.sp,
-                    color = Color.Gray
-                )
-                Text(
-                    text = "内容",
-                    fontSize = 16.sp
-                )
+                group.contents.forEach { content ->
+                    Text(
+                        text = content,
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
             }
         }
 
@@ -127,7 +121,7 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             Button(
-                onClick = { /* 暂不实现 */ },
+                onClick = { viewModel.record() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
