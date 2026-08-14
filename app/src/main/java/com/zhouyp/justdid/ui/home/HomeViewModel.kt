@@ -4,12 +4,17 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zhouyp.justdid.domain.model.PushResult
 import com.zhouyp.justdid.domain.model.RecordGroup
+import com.zhouyp.justdid.domain.model.UpdatedIndexEntry
 import com.zhouyp.justdid.domain.repository.ConnectionRepository
 import com.zhouyp.justdid.domain.repository.HomeRepository
+import com.zhouyp.justdid.domain.repository.PushRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -17,17 +22,28 @@ import javax.inject.Inject
 data class HomeUiState(
     val isConnected: Boolean = true,
     val inputText: String = "",
-    val todayRecords: List<RecordGroup> = emptyList()
+    val todayRecords: List<RecordGroup> = emptyList(),
+    val isPushing: Boolean = false
 )
+
+sealed interface PushUiEvent {
+    data class Toast(val message: String) : PushUiEvent
+    data class SuccessDialog(val entries: List<UpdatedIndexEntry>) : PushUiEvent
+    data class DiscardDialog(val batchId: String, val message: String) : PushUiEvent
+}
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val homeRepository: HomeRepository,
-    private val connectionRepository: ConnectionRepository
+    private val connectionRepository: ConnectionRepository,
+    private val pushRepository: PushRepository
 ) : ViewModel(), DefaultLifecycleObserver {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState
+
+    private val _pushUiEvents = MutableSharedFlow<PushUiEvent>()
+    val pushUiEvents: SharedFlow<PushUiEvent> = _pushUiEvents
 
     init {
         loadTodayRecords()
@@ -72,5 +88,35 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             connectionRepository.connectToMaster(url)
         }
+    }
+
+    fun pushStaging() {
+        if (_uiState.value.isPushing) return
+        _uiState.value = _uiState.value.copy(isPushing = true)
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                when (val result = pushRepository.push()) {
+                    PushResult.NoData -> _pushUiEvents.emit(PushUiEvent.Toast("暂无可推送的数据"))
+                    is PushResult.Success -> _pushUiEvents.emit(PushUiEvent.SuccessDialog(result.entries))
+                    is PushResult.DiscardableError ->
+                        _pushUiEvents.emit(PushUiEvent.DiscardDialog(result.batchId, result.message))
+                    is PushResult.Error -> _pushUiEvents.emit(PushUiEvent.Toast(result.message))
+                }
+            } finally {
+                _uiState.value = _uiState.value.copy(isPushing = false)
+                loadTodayRecords()
+                refreshDailyReport()
+            }
+        }
+    }
+
+    fun discardBatch(batchId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            pushRepository.discardBatch(batchId)
+        }
+    }
+
+    fun refreshDailyReport() {
+        // TODO: 实现日报拉取后的展示刷新
     }
 }

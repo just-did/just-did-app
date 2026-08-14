@@ -2,9 +2,11 @@ package com.zhouyp.justdid.di
 
 import com.zhouyp.justdid.data.repository.HomeRepositoryImpl
 import com.zhouyp.justdid.data.repository.ConnectionRepositoryImpl
+import com.zhouyp.justdid.data.repository.PushRepositoryImpl
 import com.zhouyp.justdid.data.repository.SettingsRepositoryImpl
 import com.zhouyp.justdid.domain.repository.ConnectionRepository
 import com.zhouyp.justdid.domain.repository.HomeRepository
+import com.zhouyp.justdid.domain.repository.PushRepository
 import com.zhouyp.justdid.domain.repository.SettingsRepository
 import dagger.Binds
 import dagger.Module
@@ -23,4 +25,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindConnectionRepository(impl: ConnectionRepositoryImpl): ConnectionRepository
+
+    @Binds
+    abstract fun bindPushRepository(impl: PushRepositoryImpl): PushRepository
 }

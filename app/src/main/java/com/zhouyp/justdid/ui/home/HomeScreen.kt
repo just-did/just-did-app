@@ -13,19 +13,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,9 +44,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import com.zhouyp.justdid.domain.model.UpdatedIndexEntry
 import com.zhouyp.justdid.ui.components.ConnectionIndicator
 import com.zhouyp.justdid.ui.navigation.Route
 import com.zhouyp.justdid.ui.qrcode.CustomScannerActivity
+
+private data class DiscardPrompt(val batchId: String, val message: String)
 
 @Composable
 fun HomeScreen(
@@ -60,6 +69,21 @@ fun HomeScreen(
     DisposableEffect(viewModel, lifecycleOwner) {
         lifecycleOwner.lifecycle.addObserver(viewModel)
         onDispose { lifecycleOwner.lifecycle.removeObserver(viewModel) }
+    }
+
+    val context = LocalContext.current
+    var successEntries by remember { mutableStateOf<List<UpdatedIndexEntry>?>(null) }
+    var discardPrompt by remember { mutableStateOf<DiscardPrompt?>(null) }
+
+    LaunchedEffect(viewModel) {
+        viewModel.pushUiEvents.collect { event ->
+            when (event) {
+                is PushUiEvent.Toast ->
+                    Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                is PushUiEvent.SuccessDialog -> successEntries = event.entries
+                is PushUiEvent.DiscardDialog -> discardPrompt = DiscardPrompt(event.batchId, event.message)
+            }
+        }
     }
 
     Column(
@@ -86,12 +110,9 @@ fun HomeScreen(
                 }
             )
             Spacer(modifier = Modifier.width(6.dp))
-            val context = LocalContext.current
             Button(
-                onClick = {
-                    Toast.makeText(context, "推送【测试】", Toast.LENGTH_SHORT).show()
-                },
-                enabled = uiState.isConnected,
+                onClick = { viewModel.pushStaging() },
+                enabled = uiState.isConnected && !uiState.isPushing,
                 modifier = Modifier.height(30.dp),
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                 shape = ButtonDefaults.outlinedShape,
@@ -100,7 +121,7 @@ fun HomeScreen(
                 )
             ) {
                 Text(
-                    text = "推送",
+                    text = if (uiState.isPushing) "推送中" else "推送",
                     fontSize = 13.sp
                 )
             }
@@ -190,5 +211,62 @@ fun HomeScreen(
                 )
             }
         }
+    }
+
+    successEntries?.let { entries ->
+        AlertDialog(
+            onDismissRequest = { successEntries = null },
+            title = { Text("同步成功") },
+            text = {
+                Column {
+                    Text("是否拉取更新后的日报？")
+                    entries.forEach { entry ->
+                        Text(
+                            text = entry.path,
+                            fontSize = 13.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        successEntries = null
+                        Toast.makeText(context, "拉取成功", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Text("拉取")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { successEntries = null }) {
+                    Text("不拉取")
+                }
+            }
+        )
+    }
+
+    discardPrompt?.let { prompt ->
+        AlertDialog(
+            onDismissRequest = { discardPrompt = null },
+            title = { Text("批数据错误") },
+            text = { Text(prompt.message) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.discardBatch(prompt.batchId)
+                        discardPrompt = null
+                    }
+                ) {
+                    Text("丢弃")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { discardPrompt = null }) {
+                    Text("保留")
+                }
+            }
+        )
     }
 }
