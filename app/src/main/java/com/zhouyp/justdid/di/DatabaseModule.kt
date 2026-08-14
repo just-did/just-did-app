@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.zhouyp.justdid.data.local.db.AppDatabase
+import com.zhouyp.justdid.data.local.db.dao.DailyReportIndexDao
 import com.zhouyp.justdid.data.local.db.dao.NoteDao
 import dagger.Module
 import dagger.Provides
@@ -25,13 +26,18 @@ object DatabaseModule {
         return Room.databaseBuilder(
             context,
             AppDatabase::class.java,
-            "justdid.db"
+            "just_do.db"
         ).build()
     }
 
     @Provides
     fun provideNoteDao(database: AppDatabase): NoteDao {
         return database.noteDao()
+    }
+
+    @Provides
+    fun provideDailyReportIndexDao(database: AppDatabase): DailyReportIndexDao {
+        return database.dailyReportIndexDao()
     }
 
     @Provides

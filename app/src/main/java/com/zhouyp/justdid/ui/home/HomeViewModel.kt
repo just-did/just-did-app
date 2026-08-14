@@ -4,13 +4,16 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zhouyp.justdid.domain.model.FetchResult
 import com.zhouyp.justdid.domain.model.PushResult
 import com.zhouyp.justdid.domain.model.RecordGroup
 import com.zhouyp.justdid.domain.model.UpdatedIndexEntry
 import com.zhouyp.justdid.domain.repository.ConnectionRepository
+import com.zhouyp.justdid.domain.repository.DailyReportRepository
 import com.zhouyp.justdid.domain.repository.HomeRepository
 import com.zhouyp.justdid.domain.repository.PushRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,7 +39,8 @@ sealed interface PushUiEvent {
 class HomeViewModel @Inject constructor(
     private val homeRepository: HomeRepository,
     private val connectionRepository: ConnectionRepository,
-    private val pushRepository: PushRepository
+    private val pushRepository: PushRepository,
+    private val dailyReportRepository: DailyReportRepository
 ) : ViewModel(), DefaultLifecycleObserver {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -113,6 +117,19 @@ class HomeViewModel @Inject constructor(
     fun discardBatch(batchId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             pushRepository.discardBatch(batchId)
+        }
+    }
+
+    fun fetchDailyReports(dates: List<LocalDate>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            when (val result = dailyReportRepository.fetch(dates)) {
+                FetchResult.Success -> {
+                    _pushUiEvents.emit(PushUiEvent.Toast("拉取成功"))
+                    refreshDailyReport()
+                }
+                FetchResult.NotFound -> _pushUiEvents.emit(PushUiEvent.Toast("无文件"))
+                is FetchResult.Error -> _pushUiEvents.emit(PushUiEvent.Toast(result.message))
+            }
         }
     }
 

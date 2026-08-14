@@ -3,6 +3,8 @@ package com.zhouyp.justdid.data.repository
 import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
+import com.zhouyp.justdid.data.local.db.dao.DailyReportIndexDao
+import com.zhouyp.justdid.data.local.db.entity.MobileDailyReportIndexEntity
 import com.zhouyp.justdid.data.remote.dto.PushResponse
 import com.zhouyp.justdid.domain.BatchIdGenerator
 import com.zhouyp.justdid.domain.model.PushResult
@@ -28,6 +30,7 @@ import javax.inject.Singleton
 class PushRepositoryImpl @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val batchIdGenerator: BatchIdGenerator,
+    private val indexDao: DailyReportIndexDao,
     @ApplicationContext private val context: Context
 ) : PushRepository {
 
@@ -137,7 +140,7 @@ class PushRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun classifyResponse(batchId: String, body: String?): PushResult {
+    private suspend fun classifyResponse(batchId: String, body: String?): PushResult {
         val response = try {
             gson.fromJson(body, PushResponse::class.java)
         } catch (e: Exception) {
@@ -148,13 +151,24 @@ class PushRepositoryImpl @Inject constructor(
         return when (message) {
             MESSAGE_SUCCESS -> {
                 File(filesDir, batchId).deleteRecursively()
-                Log.d(TAG, "推送成功，批文件夹已删除: $batchId")
-                PushResult.Success(response.updatedIndex.orEmpty().map {
+                val updatedIndex = response.updatedIndex.orEmpty()
+                indexDao.upsertAll(updatedIndex.map {
+                    MobileDailyReportIndexEntity(
+                        year = it.year,
+                        month = it.month,
+                        day = it.day,
+                        path = it.path.orEmpty().removePrefix("data/"),
+                        fileSize = it.fileSize,
+                        status = 0
+                    )
+                })
+                Log.d(TAG, "推送成功，批文件夹已删除并初始化索引: $batchId")
+                PushResult.Success(updatedIndex.map {
                     UpdatedIndexEntry(
                         year = it.year,
                         month = it.month,
                         day = it.day,
-                        path = it.path.orEmpty(),
+                        path = it.path.orEmpty().removePrefix("data/"),
                         fileSize = it.fileSize
                     )
                 })

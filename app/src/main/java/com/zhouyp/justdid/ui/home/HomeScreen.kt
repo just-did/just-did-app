@@ -48,6 +48,7 @@ import com.zhouyp.justdid.domain.model.UpdatedIndexEntry
 import com.zhouyp.justdid.ui.components.ConnectionIndicator
 import com.zhouyp.justdid.ui.navigation.Route
 import com.zhouyp.justdid.ui.qrcode.CustomScannerActivity
+import java.time.LocalDate
 
 private data class DiscardPrompt(val batchId: String, val message: String)
 
@@ -214,15 +215,16 @@ fun HomeScreen(
     }
 
     successEntries?.let { entries ->
+        val dates = entries.map { LocalDate.of(it.year, it.month, it.day) }
         AlertDialog(
             onDismissRequest = { successEntries = null },
             title = { Text("同步成功") },
             text = {
                 Column {
                     Text("是否拉取更新后的日报？")
-                    entries.forEach { entry ->
+                    dates.forEach { date ->
                         Text(
-                            text = entry.path,
+                            text = date.toString(),
                             fontSize = 13.sp,
                             color = Color.Gray
                         )
@@ -233,7 +235,7 @@ fun HomeScreen(
                 TextButton(
                     onClick = {
                         successEntries = null
-                        Toast.makeText(context, "拉取成功", Toast.LENGTH_SHORT).show()
+                        viewModel.fetchDailyReports(dates)
                     }
                 ) {
                     Text("拉取")
