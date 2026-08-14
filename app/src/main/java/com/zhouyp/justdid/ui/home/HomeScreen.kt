@@ -1,13 +1,16 @@
 package com.zhouyp.justdid.ui.home
 
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -26,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -81,6 +85,25 @@ fun HomeScreen(
                     })
                 }
             )
+            Spacer(modifier = Modifier.width(6.dp))
+            val context = LocalContext.current
+            Button(
+                onClick = {
+                    Toast.makeText(context, "推送【测试】", Toast.LENGTH_SHORT).show()
+                },
+                enabled = uiState.isConnected,
+                modifier = Modifier.height(30.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                shape = ButtonDefaults.outlinedShape,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF008CFF)
+                )
+            ) {
+                Text(
+                    text = "推送",
+                    fontSize = 13.sp
+                )
+            }
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = "Just Did",
