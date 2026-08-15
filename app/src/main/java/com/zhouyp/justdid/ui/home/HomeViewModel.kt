@@ -55,7 +55,6 @@ class HomeViewModel @Inject constructor(
     private var fullDates: List<LocalDate> = emptyList()
 
     init {
-        refreshToday()
         viewModelScope.launch(Dispatchers.IO) {
             connectionRepository.isConnected.collect { connected ->
                 _uiState.value = _uiState.value.copy(isConnected = connected)
@@ -65,6 +64,7 @@ class HomeViewModel @Inject constructor(
 
     override fun onStart(owner: LifecycleOwner) {
         connectionRepository.startPolling()
+        refreshDailyReport()
     }
 
     override fun onStop(owner: LifecycleOwner) {
@@ -165,19 +165,6 @@ class HomeViewModel @Inject constructor(
                 FetchResult.NotFound -> _pushUiEvents.emit(PushUiEvent.Toast("无文件"))
                 is FetchResult.Error -> _pushUiEvents.emit(PushUiEvent.Toast(result.message))
             }
-        }
-    }
-
-    private fun refreshToday() {
-        viewModelScope.launch(Dispatchers.IO) {
-            fullDates = homeRepository.getContentDates()
-            val today = fullDates.last()
-            val display = homeRepository.getDailyDisplay(today)
-            _uiState.value = _uiState.value.copy(
-                contentDates = allDatesDesc(),
-                displays = mapOf(today to display),
-                anchorDate = today
-            )
         }
     }
 
