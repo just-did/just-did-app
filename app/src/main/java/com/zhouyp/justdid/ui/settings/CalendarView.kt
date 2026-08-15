@@ -28,10 +28,12 @@ import java.time.YearMonth
 fun CalendarGrid(
     currentMonth: YearMonth,
     selectedDates: Set<LocalDate>,
+    mode: CalendarMode,
     onDateClick: (LocalDate) -> Unit
 ) {
     val firstOfMonth = currentMonth.atDay(1)
     val daysInMonth = currentMonth.lengthOfMonth()
+    val today = LocalDate.now()
 
     val dayOfWeek = firstOfMonth.dayOfWeek.value
     val offset = (dayOfWeek - DayOfWeek.MONDAY.value) % 7
@@ -58,6 +60,7 @@ fun CalendarGrid(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 for (date in row) {
+                    val isFutureDisabled = mode == CalendarMode.FETCH && date > today
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -68,6 +71,7 @@ fun CalendarGrid(
                             date = date,
                             isCurrentMonth = YearMonth.from(date) == currentMonth,
                             isSelected = date in selectedDates,
+                            isDisabled = isFutureDisabled,
                             onClick = {
                                 if (YearMonth.from(date) == currentMonth) {
                                     onDateClick(date)
@@ -109,18 +113,20 @@ private fun DateCell(
     date: LocalDate,
     isCurrentMonth: Boolean,
     isSelected: Boolean,
+    isDisabled: Boolean,
     onClick: () -> Unit
 ) {
     val textColor = when {
         isSelected -> Color.White
-        !isCurrentMonth -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+        isDisabled || !isCurrentMonth ->
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
         else -> MaterialTheme.colorScheme.onSurface
     }
 
     Box(
         modifier = Modifier
             .padding(2.dp)
-            .clickable { onClick() },
+            .clickable(enabled = !isDisabled) { onClick() },
         contentAlignment = Alignment.Center
     ) {
         if (isSelected) {

@@ -5,6 +5,8 @@ import android.util.Log
 import com.google.gson.Gson
 import com.zhouyp.justdid.data.local.db.dao.DailyReportIndexDao
 import com.zhouyp.justdid.data.local.db.entity.MobileDailyReportIndexEntity
+import com.zhouyp.justdid.data.remote.dto.FetchIndexResponse
+import com.zhouyp.justdid.domain.model.FetchIndexResult
 import com.zhouyp.justdid.domain.model.FetchResult
 import com.zhouyp.justdid.domain.repository.DailyReportRepository
 import com.zhouyp.justdid.domain.repository.SettingsRepository
@@ -101,6 +103,79 @@ class DailyReportRepositoryImpl @Inject constructor(
             Log.e(TAG, "拉取异常: ${e.javaClass.simpleName}: ${e.message}", e)
             FetchResult.Error(ERROR_MESSAGE)
         }
+    }
+
+    override suspend fun fetchIndex(dates: List<LocalDate>): FetchIndexResult = withContext(Dispatchers.IO) {
+        if (dates.isEmpty()) return@withContext FetchIndexResult.Error(ERROR_MESSAGE)
+        val rootUrl = settingsRepository.getMasterRootUrl()
+            ?: return@withContext FetchIndexResult.Error(ERROR_MESSAGE)
+
+        val bodyJson = gson.toJson(mapOf("dates" to dates.map { it.format(DATE_REQUEST_FORMAT) }))
+        val request = Request.Builder()
+            .url("$rootUrl/sync/fetch-index")
+            .post(bodyJson.toRequestBody("application/json".toMediaType()))
+            .build()
+        Log.d(TAG, "索引拉取请求: ${request.url}, dates=${dates.size}")
+
+        try {
+            client.newCall(request).execute().use { response ->
+                when {
+                    response.code == 404 -> {
+                        Log.d(TAG, "索引拉取响应 404 无索引条目")
+                        markDatesAbsent(dates)
+                        FetchIndexResult.NotFound
+                    }
+                    response.isSuccessful -> {
+                        val body = response.body?.string()
+                        val indexResponse = try {
+                            gson.fromJson(body, FetchIndexResponse::class.java)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "索引响应解析异常", e)
+                            return@use FetchIndexResult.Error(ERROR_MESSAGE)
+                        }
+                        val index = indexResponse.index.orEmpty()
+                        val existingDates = index.mapNotNull { dto ->
+                            runCatching { LocalDate.of(dto.year, dto.month, dto.day) }.getOrNull()
+                        }
+                        indexDao.upsertAll(index.map { dto ->
+                            MobileDailyReportIndexEntity(
+                                year = dto.year,
+                                month = dto.month,
+                                day = dto.day,
+                                path = dto.path.orEmpty().removePrefix("data/"),
+                                fileSize = dto.fileSize,
+                                status = 0
+                            )
+                        })
+                        markDatesAbsent(dates.filter { it !in existingDates })
+                        Log.d(TAG, "索引拉取成功: 存在 ${existingDates.size} 天")
+                        FetchIndexResult.Success(existingDates.sorted())
+                    }
+                    else -> {
+                        Log.w(TAG, "索引拉取响应异常: code=${response.code}")
+                        FetchIndexResult.Error(ERROR_MESSAGE)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "索引拉取异常: ${e.javaClass.simpleName}: ${e.message}", e)
+            FetchIndexResult.Error(ERROR_MESSAGE)
+        }
+    }
+
+    private suspend fun markDatesAbsent(dates: List<LocalDate>) {
+        val entries = dates.map { date ->
+            val existing = indexDao.findByDate(date.year, date.monthValue, date.dayOfMonth)
+            existing ?: MobileDailyReportIndexEntity(
+                year = date.year,
+                month = date.monthValue,
+                day = date.dayOfMonth,
+                path = date.format(DATE_PATH_FORMAT) + ".txt",
+                fileSize = 0,
+                status = -1
+            )
+        }
+        indexDao.upsertAll(entries)
     }
 
     private fun extractZip(zipFile: File): Set<LocalDate>? {

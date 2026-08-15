@@ -1,5 +1,6 @@
 package com.zhouyp.justdid.ui.settings
 
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,10 +32,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -60,6 +63,16 @@ fun SettingsScreen(
         val contents = result.contents
         if (!contents.isNullOrEmpty()) {
             viewModel.connectToMaster(contents)
+        }
+    }
+
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.settingsUiEvents.collect { event ->
+            when (event) {
+                is SettingsUiEvent.Toast ->
+                    Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -158,7 +171,8 @@ fun SettingsScreen(
                     onToggle = { viewModel.toggleSelectAllInMonth() }
                 )
 
-                // 月份导航
+                // 月份导航（封顶当前月：下一页为未来月份时禁用）
+                val isAtCurrentMonth = !uiState.currentMonth.isBefore(YearMonth.now())
                 IconButton(
                     onClick = { viewModel.navigateMonth(-1) },
                     modifier = Modifier.padding(0.dp)
@@ -171,9 +185,15 @@ fun SettingsScreen(
                 )
                 IconButton(
                     onClick = { viewModel.navigateMonth(1) },
+                    enabled = !isAtCurrentMonth,
                     modifier = Modifier.padding(0.dp)
                 ) {
-                    Text(">", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = ">",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isAtCurrentMonth) Color.Gray else Color.Unspecified
+                    )
                 }
             }
 
@@ -183,6 +203,7 @@ fun SettingsScreen(
             CalendarGrid(
                 currentMonth = uiState.currentMonth,
                 selectedDates = uiState.selectedDates,
+                mode = uiState.mode,
                 onDateClick = { date -> viewModel.selectDate(date) }
             )
         }
@@ -192,10 +213,22 @@ fun SettingsScreen(
         // 操作按钮
         val buttonText = when (uiState.mode) {
             CalendarMode.CLEAR -> "清空已选"
-            CalendarMode.FETCH -> "拉取已选"
+            CalendarMode.FETCH -> when {
+                uiState.isFetching -> "拉取中"
+                !uiState.isConnected -> "拉取已选（未连接）"
+                else -> "拉取已选"
+            }
         }
         Button(
-            onClick = { /* 暂不实现业务逻辑 */ },
+            onClick = {
+                if (uiState.mode == CalendarMode.FETCH) {
+                    viewModel.fetchSelected()
+                }
+            },
+            enabled = when (uiState.mode) {
+                CalendarMode.CLEAR -> true
+                CalendarMode.FETCH -> uiState.isConnected && !uiState.isFetching
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 10.dp)
