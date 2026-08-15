@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -32,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,11 +46,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import com.zhouyp.justdid.domain.model.DailyDisplay
+import com.zhouyp.justdid.domain.model.RecordSource
 import com.zhouyp.justdid.domain.model.UpdatedIndexEntry
 import com.zhouyp.justdid.ui.components.ConnectionIndicator
 import com.zhouyp.justdid.ui.navigation.Route
 import com.zhouyp.justdid.ui.qrcode.CustomScannerActivity
 import java.time.LocalDate
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 private data class DiscardPrompt(val batchId: String, val message: String)
 
@@ -85,6 +91,28 @@ fun HomeScreen(
                 is PushUiEvent.DiscardDialog -> discardPrompt = DiscardPrompt(event.batchId, event.message)
             }
         }
+    }
+
+    val listState = rememberLazyListState()
+
+    // 记录后（或当前阅读日期消失后）跳回今天（reverseLayout 下索引 0 即底部=今天）
+    LaunchedEffect(uiState.scrollToTodayTick) {
+        if (uiState.scrollToTodayTick > 0 && uiState.contentDates.isNotEmpty()) {
+            listState.animateScrollToItem(0)
+        }
+    }
+
+    // 滚动锚点上报（窗口缓存中心）；仅在用户滚动时触发，初始锚点由 ViewModel 定为今天
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            listState.firstVisibleItemIndex to listState.isScrollInProgress
+        }
+            .distinctUntilChanged()
+            .collect { (index, scrolling) ->
+                if (scrolling) {
+                    uiState.contentDates.getOrNull(index)?.let { viewModel.onAnchorChanged(it) }
+                }
+            }
     }
 
     Column(
@@ -144,27 +172,23 @@ fun HomeScreen(
             }
         }
 
-        // 记录列表区（填充剩余空间）
+        // 记录列表区（填充剩余空间）；reverseLayout 底部锚定：今天在底部，历史在上方
         LazyColumn(
+            state = listState,
+            reverseLayout = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .weight(1f)
         ) {
-            items(uiState.todayRecords) { group ->
-                Text(
-                    text = group.time,
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(top = 8.dp)
+            items(uiState.contentDates, key = { it }) { date ->
+                val display = uiState.displays[date]
+                // 未加载的日期占满一屏：打开时只有今天露出，上滑到它时才加载
+                DaySection(
+                    modifier = if (display == null) Modifier.fillParentMaxHeight() else Modifier,
+                    date = date,
+                    display = display
                 )
-                group.contents.forEach { content ->
-                    Text(
-                        text = content,
-                        fontSize = 16.sp,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                }
             }
         }
 
@@ -270,5 +294,79 @@ fun HomeScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun DaySection(
+    modifier: Modifier = Modifier,
+    date: LocalDate,
+    display: DailyDisplay?,
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = dayHeaderText(date),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Gray,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        val groups = display?.groups
+        when {
+            groups == null -> Text(
+                text = "加载中…",
+                fontSize = 13.sp,
+                color = Color.LightGray,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            groups.isEmpty() && date == LocalDate.now() -> Text(
+                text = "今天还没有记录",
+                fontSize = 14.sp,
+                color = Color.Gray,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            else -> groups.forEach { group ->
+                val isStaging = group.source == RecordSource.STAGING
+                val accent = Color(0xFF008CFF)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = group.time,
+                        fontSize = 14.sp,
+                        color = if (isStaging) accent else Color.Gray,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                    if (isStaging) {
+                        Text(
+                            text = "未同步",
+                            fontSize = 10.sp,
+                            color = accent,
+                            modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+                        )
+                    }
+                }
+                group.contents.forEach { content ->
+                    Text(
+                        text = content,
+                        fontSize = 16.sp,
+                        color = if (isStaging) accent else Color.Unspecified,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun dayHeaderText(date: LocalDate): String {
+    val today = LocalDate.now()
+    return when (date) {
+        today -> "今天"
+        today.minusDays(1) -> "昨天"
+        else -> if (date.year == today.year) {
+            "${date.monthValue}月${date.dayOfMonth}日"
+        } else {
+            "${date.year}年${date.monthValue}月${date.dayOfMonth}日"
+        }
     }
 }

@@ -4,9 +4,9 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zhouyp.justdid.domain.model.DailyDisplay
 import com.zhouyp.justdid.domain.model.FetchResult
 import com.zhouyp.justdid.domain.model.PushResult
-import com.zhouyp.justdid.domain.model.RecordGroup
 import com.zhouyp.justdid.domain.model.UpdatedIndexEntry
 import com.zhouyp.justdid.domain.repository.ConnectionRepository
 import com.zhouyp.justdid.domain.repository.DailyReportRepository
@@ -25,8 +25,11 @@ import javax.inject.Inject
 data class HomeUiState(
     val isConnected: Boolean = true,
     val inputText: String = "",
-    val todayRecords: List<RecordGroup> = emptyList(),
-    val isPushing: Boolean = false
+    val isPushing: Boolean = false,
+    val contentDates: List<LocalDate> = emptyList(),
+    val displays: Map<LocalDate, DailyDisplay> = emptyMap(),
+    val anchorDate: LocalDate? = null,
+    val scrollToTodayTick: Int = 0
 )
 
 sealed interface PushUiEvent {
@@ -49,8 +52,10 @@ class HomeViewModel @Inject constructor(
     private val _pushUiEvents = MutableSharedFlow<PushUiEvent>()
     val pushUiEvents: SharedFlow<PushUiEvent> = _pushUiEvents
 
+    private var fullDates: List<LocalDate> = emptyList()
+
     init {
-        loadTodayRecords()
+        refreshToday()
         viewModelScope.launch(Dispatchers.IO) {
             connectionRepository.isConnected.collect { connected ->
                 _uiState.value = _uiState.value.copy(isConnected = connected)
@@ -76,15 +81,46 @@ class HomeViewModel @Inject constructor(
 
         viewModelScope.launch(Dispatchers.IO) {
             homeRepository.saveRecord(content)
-            _uiState.value = _uiState.value.copy(inputText = "")
-            loadTodayRecords()
+            fullDates = homeRepository.getContentDates()
+            val today = fullDates.last()
+            val display = homeRepository.getDailyDisplay(today)
+            _uiState.value = _uiState.value.copy(
+                inputText = "",
+                contentDates = allDatesDesc(),
+                displays = mapOf(today to display),
+                anchorDate = today,
+                scrollToTodayTick = _uiState.value.scrollToTodayTick + 1
+            )
         }
     }
 
-    fun loadTodayRecords() {
+    private fun allDatesDesc(): List<LocalDate> {
+        // 全量日期倒序：今天在首位（列表底部），历史在后（上方）
+        return fullDates.sortedDescending()
+    }
+
+    fun loadDisplay(date: LocalDate) {
         viewModelScope.launch(Dispatchers.IO) {
-            val records = homeRepository.getTodayRecords()
-            _uiState.value = _uiState.value.copy(todayRecords = records)
+            if (_uiState.value.displays.containsKey(date)) return@launch
+            val display = homeRepository.getDailyDisplay(date)
+            _uiState.value = _uiState.value.copy(
+                displays = _uiState.value.displays + (date to display)
+            )
+        }
+    }
+
+    fun onAnchorChanged(date: LocalDate) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val state = _uiState.value
+            if (state.anchorDate == date) return@launch
+
+            val windowStart = date.minusDays(5)
+            val windowEnd = date.plusDays(5)
+            _uiState.value = state.copy(
+                anchorDate = date,
+                displays = state.displays.filterKeys { it in windowStart..windowEnd }
+            )
+            loadDisplay(date)
         }
     }
 
@@ -108,7 +144,6 @@ class HomeViewModel @Inject constructor(
                 }
             } finally {
                 _uiState.value = _uiState.value.copy(isPushing = false)
-                loadTodayRecords()
                 refreshDailyReport()
             }
         }
@@ -133,7 +168,37 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun refreshToday() {
+        viewModelScope.launch(Dispatchers.IO) {
+            fullDates = homeRepository.getContentDates()
+            val today = fullDates.last()
+            val display = homeRepository.getDailyDisplay(today)
+            _uiState.value = _uiState.value.copy(
+                contentDates = allDatesDesc(),
+                displays = mapOf(today to display),
+                anchorDate = today
+            )
+        }
+    }
+
     fun refreshDailyReport() {
-        // TODO: 实现日报拉取后的展示刷新
+        viewModelScope.launch(Dispatchers.IO) {
+            val state = _uiState.value
+            val anchor = state.anchorDate
+            fullDates = homeRepository.getContentDates()
+            val anchorExists = anchor != null && anchor in fullDates
+            val target = if (anchorExists) anchor else fullDates.last()
+            val display = homeRepository.getDailyDisplay(target)
+            _uiState.value = _uiState.value.copy(
+                contentDates = allDatesDesc(),
+                displays = mapOf(target to display),
+                anchorDate = target,
+                scrollToTodayTick = if (anchorExists) {
+                    state.scrollToTodayTick
+                } else {
+                    state.scrollToTodayTick + 1
+                }
+            )
+        }
     }
 }
