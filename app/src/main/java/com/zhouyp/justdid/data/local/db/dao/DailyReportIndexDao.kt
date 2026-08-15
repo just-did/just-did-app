@@ -19,4 +19,7 @@ interface DailyReportIndexDao {
 
     @Query("DELETE FROM mobile_daliy_report_index WHERE year = :year AND month = :month AND day = :day")
     suspend fun deleteByDate(year: Int, month: Int, day: Int)
+
+    @Query("SELECT COALESCE(SUM(file_size), 0) FROM mobile_daliy_report_index")
+    suspend fun getTotalFileSize(): Long
 }

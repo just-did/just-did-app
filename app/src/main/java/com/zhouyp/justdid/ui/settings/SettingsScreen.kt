@@ -185,7 +185,11 @@ fun SettingsScreen(
 
         // 饼图区域
         Spacer(modifier = Modifier.height(12.dp))
-        PieChartView(usedPercent = uiState.storageUsedPercent)
+        PieChartView(
+            usedBytes = uiState.cacheUsedBytes,
+            totalBytes = uiState.cacheTotalBytes,
+            onRefresh = { viewModel.refreshCacheUsage() }
+        )
 
         Spacer(modifier = Modifier.height(18.dp))
 

@@ -12,6 +12,9 @@ import com.zhouyp.justdid.domain.repository.DailyReportRepository
 import com.zhouyp.justdid.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -34,6 +37,9 @@ class DailyReportRepositoryImpl @Inject constructor(
 
     private val gson = Gson()
 
+    private val _cacheUsage = MutableStateFlow(0L)
+    override val cacheUsage: StateFlow<Long> = _cacheUsage.asStateFlow()
+
     private val client = OkHttpClient.Builder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .writeTimeout(5, TimeUnit.SECONDS)
@@ -46,6 +52,12 @@ class DailyReportRepositoryImpl @Inject constructor(
         private val DATE_REQUEST_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd")
         private val DATE_PATH_FORMAT = DateTimeFormatter.ofPattern("yyyy/MM/dd")
         private val ENTRY_NAME_REGEX = Regex("""^\d{4}/\d{2}/\d{2}\.txt$""")
+    }
+
+    override suspend fun refreshCacheUsage() {
+        withContext(Dispatchers.IO) {
+            _cacheUsage.value = indexDao.getTotalFileSize()
+        }
     }
 
     override suspend fun fetch(dates: List<LocalDate>): FetchResult = withContext(Dispatchers.IO) {

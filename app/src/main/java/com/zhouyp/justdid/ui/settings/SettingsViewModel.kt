@@ -4,8 +4,10 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.zhouyp.justdid.domain.model.AppConfig
 import com.zhouyp.justdid.domain.model.FetchIndexResult
 import com.zhouyp.justdid.domain.model.FetchResult
+import com.zhouyp.justdid.domain.repository.ConfigRepository
 import com.zhouyp.justdid.domain.repository.ConnectionRepository
 import com.zhouyp.justdid.domain.repository.DailyReportRepository
 import com.zhouyp.justdid.domain.repository.SettingsRepository
@@ -27,7 +29,8 @@ data class SettingsUiState(
     val mode: CalendarMode = CalendarMode.CLEAR,
     val selectedDates: Set<LocalDate> = emptySet(),
     val currentMonth: YearMonth = YearMonth.now(),
-    val storageUsedPercent: Float = 35f,
+    val cacheUsedBytes: Long = 0L,
+    val cacheTotalBytes: Long = AppConfig.DEFAULT.cacheTotalBytes,
     val showDropdownMenu: Boolean = false,
     val isFetching: Boolean = false,
     val isClearing: Boolean = false,
@@ -42,7 +45,8 @@ sealed interface SettingsUiEvent {
 class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val connectionRepository: ConnectionRepository,
-    private val dailyReportRepository: DailyReportRepository
+    private val dailyReportRepository: DailyReportRepository,
+    private val configRepository: ConfigRepository
 ) : ViewModel(), DefaultLifecycleObserver {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -57,10 +61,26 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isConnected = connected)
             }
         }
+        viewModelScope.launch(Dispatchers.IO) {
+            dailyReportRepository.cacheUsage.collect { usage ->
+                _uiState.value = _uiState.value.copy(cacheUsedBytes = usage)
+            }
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.value = _uiState.value.copy(
+                cacheTotalBytes = configRepository.getConfig().cacheTotalBytes
+            )
+        }
     }
 
     override fun onStart(owner: LifecycleOwner) {
         loadReportStatus()
+    }
+
+    fun refreshCacheUsage() {
+        viewModelScope.launch(Dispatchers.IO) {
+            dailyReportRepository.refreshCacheUsage()
+        }
     }
 
     private fun loadReportStatus() {
