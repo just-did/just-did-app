@@ -205,6 +205,12 @@ class DailyReportRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getReportStatus(): Map<LocalDate, Int> = withContext(Dispatchers.IO) {
+        indexDao.getAll().associate { entry ->
+            LocalDate.of(entry.year, entry.month, entry.day) to entry.status
+        }
+    }
+
     private suspend fun markDatesAbsent(dates: List<LocalDate>) {
         val entries = dates.map { date ->
             val existing = indexDao.findByDate(date.year, date.monthValue, date.dayOfMonth)

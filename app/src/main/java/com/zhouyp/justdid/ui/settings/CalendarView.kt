@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,6 +29,7 @@ import java.time.YearMonth
 fun CalendarGrid(
     currentMonth: YearMonth,
     selectedDates: Set<LocalDate>,
+    reportStatus: Map<LocalDate, Int>,
     onDateClick: (LocalDate) -> Unit
 ) {
     val firstOfMonth = currentMonth.atDay(1)
@@ -60,6 +62,7 @@ fun CalendarGrid(
             ) {
                 for (date in row) {
                     val isFutureDisabled = date > today
+                    val isCurrentMonth = YearMonth.from(date) == currentMonth
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -68,11 +71,12 @@ fun CalendarGrid(
                     ) {
                         DateCell(
                             date = date,
-                            isCurrentMonth = YearMonth.from(date) == currentMonth,
+                            isCurrentMonth = isCurrentMonth,
                             isSelected = date in selectedDates,
                             isDisabled = isFutureDisabled,
+                            dotStatus = if (isCurrentMonth) reportStatus[date] else null,
                             onClick = {
-                                if (YearMonth.from(date) == currentMonth) {
+                                if (isCurrentMonth) {
                                     onDateClick(date)
                                 }
                             }
@@ -113,6 +117,7 @@ private fun DateCell(
     isCurrentMonth: Boolean,
     isSelected: Boolean,
     isDisabled: Boolean,
+    dotStatus: Int?,
     onClick: () -> Unit
 ) {
     val textColor = when {
@@ -120,6 +125,12 @@ private fun DateCell(
         isDisabled || !isCurrentMonth ->
             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
         else -> MaterialTheme.colorScheme.onSurface
+    }
+
+    val dotColor = when (dotStatus) {
+        1 -> Color(0xFF4CAF50)
+        0 -> Color(0xFFFF9800)
+        else -> null
     }
 
     Box(
@@ -136,11 +147,22 @@ private fun DateCell(
                     .background(Color(0xFF008CFF))
             )
         }
-        Text(
-            text = "${date.dayOfMonth}",
-            style = MaterialTheme.typography.bodySmall,
-            color = textColor,
-            textAlign = TextAlign.Center
-        )
+        Row(verticalAlignment = Alignment.Top) {
+            if (dotColor != null) {
+                Box(
+                    modifier = Modifier
+                        .padding(end = 2.dp)
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(dotColor)
+                )
+            }
+            Text(
+                text = "${date.dayOfMonth}",
+                style = MaterialTheme.typography.bodySmall,
+                color = textColor,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }

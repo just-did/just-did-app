@@ -9,4 +9,5 @@ interface DailyReportRepository {
     suspend fun fetchIndex(dates: List<LocalDate>): FetchIndexResult
     suspend fun clear(dates: List<LocalDate>)
     suspend fun clearBefore(cutoff: LocalDate)
+    suspend fun getReportStatus(): Map<LocalDate, Int>
 }

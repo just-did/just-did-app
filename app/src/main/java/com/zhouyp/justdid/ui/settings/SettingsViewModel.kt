@@ -1,5 +1,7 @@
 package com.zhouyp.justdid.ui.settings
 
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zhouyp.justdid.domain.model.FetchIndexResult
@@ -28,7 +30,8 @@ data class SettingsUiState(
     val storageUsedPercent: Float = 35f,
     val showDropdownMenu: Boolean = false,
     val isFetching: Boolean = false,
-    val isClearing: Boolean = false
+    val isClearing: Boolean = false,
+    val reportStatus: Map<LocalDate, Int> = emptyMap()
 )
 
 sealed interface SettingsUiEvent {
@@ -40,7 +43,7 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val connectionRepository: ConnectionRepository,
     private val dailyReportRepository: DailyReportRepository
-) : ViewModel() {
+) : ViewModel(), DefaultLifecycleObserver {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState
@@ -53,6 +56,17 @@ class SettingsViewModel @Inject constructor(
             connectionRepository.isConnected.collect { connected ->
                 _uiState.value = _uiState.value.copy(isConnected = connected)
             }
+        }
+    }
+
+    override fun onStart(owner: LifecycleOwner) {
+        loadReportStatus()
+    }
+
+    private fun loadReportStatus() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val status = dailyReportRepository.getReportStatus()
+            _uiState.value = _uiState.value.copy(reportStatus = status)
         }
     }
 
@@ -105,6 +119,7 @@ class SettingsViewModel @Inject constructor(
                             FetchResult.Success -> {
                                 _settingsUiEvents.emit(SettingsUiEvent.Toast("拉取成功"))
                                 _uiState.value = _uiState.value.copy(selectedDates = emptySet())
+                                loadReportStatus()
                             }
                             FetchResult.NotFound ->
                                 _settingsUiEvents.emit(SettingsUiEvent.Toast("无文件"))
@@ -139,6 +154,7 @@ class SettingsViewModel @Inject constructor(
                 dailyReportRepository.clear(dates)
                 _settingsUiEvents.emit(SettingsUiEvent.Toast("清理成功"))
                 _uiState.value = _uiState.value.copy(selectedDates = emptySet())
+                loadReportStatus()
             } finally {
                 _uiState.value = _uiState.value.copy(isClearing = false)
             }
@@ -152,6 +168,7 @@ class SettingsViewModel @Inject constructor(
             try {
                 dailyReportRepository.clearBefore(cutoff)
                 _settingsUiEvents.emit(SettingsUiEvent.Toast("清理成功"))
+                loadReportStatus()
             } finally {
                 _uiState.value = _uiState.value.copy(isClearing = false)
             }

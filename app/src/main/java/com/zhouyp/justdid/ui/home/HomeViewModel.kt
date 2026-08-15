@@ -121,24 +121,25 @@ class HomeViewModel @Inject constructor(
             // 分组按时间倒序排放（视觉上时间升序、同时间日报在前），日期头最后排放（视觉上在内容上方）
             var seq = 0
             display.groups.asReversed().forEach { group ->
-                rows.add(DisplayRow.TimeHeader(date, seq++, group.time, group.source))
-                group.contents.forEach { content ->
-                    val chunks = if (content.length > CONTENT_CHUNK_SIZE) {
+                // 组内数据倒序排放（reverseLayout 视觉相反）：视觉上时间头在上、内容按序在下
+                val chunksList = group.contents.flatMap { content ->
+                    if (content.length > CONTENT_CHUNK_SIZE) {
                         content.chunked(CONTENT_CHUNK_SIZE)
                     } else {
                         listOf(content)
                     }
-                    chunks.forEach { chunk ->
-                        rows.add(
-                            DisplayRow.ContentLine(
-                                date = date,
-                                seq = seq++,
-                                text = chunk,
-                                source = group.source
-                            )
-                        )
-                    }
                 }
+                chunksList.asReversed().forEach { chunk ->
+                    rows.add(
+                        DisplayRow.ContentLine(
+                            date = date,
+                            seq = seq++,
+                            text = chunk,
+                            source = group.source
+                        )
+                    )
+                }
+                rows.add(DisplayRow.TimeHeader(date, seq++, group.time, group.source))
             }
             rows.add(
                 DisplayRow.DayHeader(
