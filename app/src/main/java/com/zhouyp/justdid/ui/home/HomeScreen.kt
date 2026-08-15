@@ -46,7 +46,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
-import com.zhouyp.justdid.domain.model.DailyDisplay
+import com.zhouyp.justdid.domain.model.DisplayRow
 import com.zhouyp.justdid.domain.model.RecordSource
 import com.zhouyp.justdid.domain.model.UpdatedIndexEntry
 import com.zhouyp.justdid.ui.components.ConnectionIndicator
@@ -110,7 +110,7 @@ fun HomeScreen(
             .distinctUntilChanged()
             .collect { (index, scrolling) ->
                 if (scrolling) {
-                    uiState.contentDates.getOrNull(index)?.let { viewModel.onAnchorChanged(it) }
+                    uiState.displayRows.getOrNull(index)?.let { viewModel.onAnchorChanged(it.date) }
                 }
             }
     }
@@ -181,14 +181,14 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp)
                 .weight(1f)
         ) {
-            items(uiState.contentDates, key = { it }) { date ->
-                val display = uiState.displays[date]
-                // 未加载的日期占满一屏：打开时只有今天露出，上滑到它时才加载
-                DaySection(
-                    modifier = if (display == null) Modifier.fillParentMaxHeight() else Modifier,
-                    date = date,
-                    display = display
-                )
+            items(uiState.displayRows, key = { it.key }) { row ->
+                when (row) {
+                    is DisplayRow.DayHeader -> DayHeaderItem(row)
+                    is DisplayRow.Placeholder ->
+                        PlaceholderItem(row, modifier = Modifier.fillParentMaxHeight())
+                    is DisplayRow.TimeHeader -> TimeHeaderItem(row)
+                    is DisplayRow.ContentLine -> ContentLineItem(row)
+                }
             }
         }
 
@@ -298,64 +298,77 @@ fun HomeScreen(
 }
 
 @Composable
-private fun DaySection(
-    modifier: Modifier = Modifier,
-    date: LocalDate,
-    display: DailyDisplay?,
-) {
-    Column(modifier = modifier) {
+private fun DayHeaderItem(row: DisplayRow.DayHeader) {
+    Column {
         Text(
-            text = dayHeaderText(date),
+            text = dayHeaderText(row.date),
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             color = Color.Gray,
             modifier = Modifier.padding(top = 8.dp)
         )
-
-        val groups = display?.groups
-        when {
-            groups == null -> Text(
-                text = "加载中…",
-                fontSize = 13.sp,
-                color = Color.LightGray,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-            groups.isEmpty() && date == LocalDate.now() -> Text(
+        if (row.isEmptyToday) {
+            Text(
                 text = "今天还没有记录",
                 fontSize = 14.sp,
                 color = Color.Gray,
                 modifier = Modifier.padding(top = 4.dp)
             )
-            else -> groups.forEach { group ->
-                val isStaging = group.source == RecordSource.STAGING
-                val accent = Color(0xFF008CFF)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = group.time,
-                        fontSize = 14.sp,
-                        color = if (isStaging) accent else Color.Gray,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                    if (isStaging) {
-                        Text(
-                            text = "未同步",
-                            fontSize = 10.sp,
-                            color = accent,
-                            modifier = Modifier.padding(start = 4.dp, top = 8.dp)
-                        )
-                    }
-                }
-                group.contents.forEach { content ->
-                    Text(
-                        text = content,
-                        fontSize = 16.sp,
-                        color = if (isStaging) accent else Color.Unspecified,
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                }
-            }
         }
     }
+}
+
+@Composable
+private fun PlaceholderItem(row: DisplayRow.Placeholder, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        Text(
+            text = dayHeaderText(row.date),
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Gray,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        Text(
+            text = "加载中…",
+            fontSize = 13.sp,
+            color = Color.LightGray,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
+}
+
+@Composable
+private fun TimeHeaderItem(row: DisplayRow.TimeHeader) {
+    val isStaging = row.source == RecordSource.STAGING
+    val accent = Color(0xFF008CFF)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = row.time,
+            fontSize = 14.sp,
+            color = if (isStaging) accent else Color.Gray,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        if (isStaging) {
+            Text(
+                text = "未同步",
+                fontSize = 10.sp,
+                color = accent,
+                modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ContentLineItem(row: DisplayRow.ContentLine) {
+    val isStaging = row.source == RecordSource.STAGING
+    val accent = Color(0xFF008CFF)
+    Text(
+        text = row.text,
+        fontSize = 16.sp,
+        color = if (isStaging) accent else Color.Unspecified,
+        modifier = Modifier.padding(bottom = 4.dp)
+    )
 }
 
 private fun dayHeaderText(date: LocalDate): String {

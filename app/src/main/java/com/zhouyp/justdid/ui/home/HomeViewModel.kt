@@ -5,6 +5,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.zhouyp.justdid.domain.model.DailyDisplay
+import com.zhouyp.justdid.domain.model.DisplayRow
 import com.zhouyp.justdid.domain.model.FetchResult
 import com.zhouyp.justdid.domain.model.PushResult
 import com.zhouyp.justdid.domain.model.UpdatedIndexEntry
@@ -28,6 +29,7 @@ data class HomeUiState(
     val isPushing: Boolean = false,
     val contentDates: List<LocalDate> = emptyList(),
     val displays: Map<LocalDate, DailyDisplay> = emptyMap(),
+    val displayRows: List<DisplayRow> = emptyList(),
     val anchorDate: LocalDate? = null,
     val scrollToTodayTick: Int = 0
 )
@@ -53,6 +55,10 @@ class HomeViewModel @Inject constructor(
     val pushUiEvents: SharedFlow<PushUiEvent> = _pushUiEvents
 
     private var fullDates: List<LocalDate> = emptyList()
+
+    companion object {
+        private const val CONTENT_CHUNK_SIZE = 500
+    }
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -90,7 +96,7 @@ class HomeViewModel @Inject constructor(
                 displays = mapOf(today to display),
                 anchorDate = today,
                 scrollToTodayTick = _uiState.value.scrollToTodayTick + 1
-            )
+            ).withRows()
         }
     }
 
@@ -99,13 +105,61 @@ class HomeViewModel @Inject constructor(
         return fullDates.sortedDescending()
     }
 
+    private fun buildDisplayRows(
+        contentDates: List<LocalDate>,
+        displays: Map<LocalDate, DailyDisplay>
+    ): List<DisplayRow> {
+        val today = LocalDate.now()
+        val rows = mutableListOf<DisplayRow>()
+        contentDates.forEach { date ->
+            val display = displays[date]
+            if (display == null) {
+                rows.add(DisplayRow.Placeholder(date))
+                return@forEach
+            }
+            // reverseLayout 下数据顺序与视觉顺序相反：
+            // 分组按时间倒序排放（视觉上时间升序、同时间日报在前），日期头最后排放（视觉上在内容上方）
+            var seq = 0
+            display.groups.asReversed().forEach { group ->
+                rows.add(DisplayRow.TimeHeader(date, seq++, group.time, group.source))
+                group.contents.forEach { content ->
+                    val chunks = if (content.length > CONTENT_CHUNK_SIZE) {
+                        content.chunked(CONTENT_CHUNK_SIZE)
+                    } else {
+                        listOf(content)
+                    }
+                    chunks.forEach { chunk ->
+                        rows.add(
+                            DisplayRow.ContentLine(
+                                date = date,
+                                seq = seq++,
+                                text = chunk,
+                                source = group.source
+                            )
+                        )
+                    }
+                }
+            }
+            rows.add(
+                DisplayRow.DayHeader(
+                    date = date,
+                    isEmptyToday = display.groups.isEmpty() && date == today
+                )
+            )
+        }
+        return rows
+    }
+
+    private fun HomeUiState.withRows(): HomeUiState =
+        copy(displayRows = buildDisplayRows(contentDates, displays))
+
     fun loadDisplay(date: LocalDate) {
         viewModelScope.launch(Dispatchers.IO) {
             if (_uiState.value.displays.containsKey(date)) return@launch
             val display = homeRepository.getDailyDisplay(date)
             _uiState.value = _uiState.value.copy(
                 displays = _uiState.value.displays + (date to display)
-            )
+            ).withRows()
         }
     }
 
@@ -119,7 +173,7 @@ class HomeViewModel @Inject constructor(
             _uiState.value = state.copy(
                 anchorDate = date,
                 displays = state.displays.filterKeys { it in windowStart..windowEnd }
-            )
+            ).withRows()
             loadDisplay(date)
         }
     }
@@ -185,7 +239,7 @@ class HomeViewModel @Inject constructor(
                 } else {
                     state.scrollToTodayTick + 1
                 }
-            )
+            ).withRows()
         }
     }
 }
