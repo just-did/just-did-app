@@ -7,4 +7,6 @@ import java.time.LocalDate
 interface DailyReportRepository {
     suspend fun fetch(dates: List<LocalDate>): FetchResult
     suspend fun fetchIndex(dates: List<LocalDate>): FetchIndexResult
+    suspend fun clear(dates: List<LocalDate>)
+    suspend fun clearBefore(cutoff: LocalDate)
 }

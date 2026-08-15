@@ -163,6 +163,48 @@ class DailyReportRepositoryImpl @Inject constructor(
         }
     }
 
+    private val dataDir: File
+        get() = File(context.filesDir, "data")
+
+    private fun reportFileFor(date: LocalDate): File {
+        val path = date.format(DATE_PATH_FORMAT) + ".txt"
+        return File(context.filesDir, "data/$path")
+    }
+
+    override suspend fun clear(dates: List<LocalDate>) {
+        withContext(Dispatchers.IO) {
+            dates.forEach { date ->
+                reportFileFor(date).delete()
+                indexDao.deleteByDate(date.year, date.monthValue, date.dayOfMonth)
+            }
+            Log.d(TAG, "清理完成: ${dates.size} 天")
+        }
+    }
+
+    override suspend fun clearBefore(cutoff: LocalDate) {
+        withContext(Dispatchers.IO) {
+            if (dataDir.exists()) {
+                dataDir.walkTopDown().filter { it.isFile }.forEach { file ->
+                    val rel = file.relativeTo(dataDir).path.replace('\\', '/')
+                    if (ENTRY_NAME_REGEX.matches(rel)) {
+                        val parts = rel.removeSuffix(".txt").split("/")
+                        val date = LocalDate.of(parts[0].toInt(), parts[1].toInt(), parts[2].toInt())
+                        if (!date.isAfter(cutoff)) {
+                            file.delete()
+                        }
+                    }
+                }
+            }
+            indexDao.getAll().forEach { entry ->
+                val date = LocalDate.of(entry.year, entry.month, entry.day)
+                if (!date.isAfter(cutoff)) {
+                    indexDao.deleteByDate(entry.year, entry.month, entry.day)
+                }
+            }
+            Log.d(TAG, "时间清理完成: cutoff=$cutoff")
+        }
+    }
+
     private suspend fun markDatesAbsent(dates: List<LocalDate>) {
         val entries = dates.map { date ->
             val existing = indexDao.findByDate(date.year, date.monthValue, date.dayOfMonth)

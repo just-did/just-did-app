@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.IndeterminateCheckBox
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -31,10 +32,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -51,6 +56,18 @@ import com.zhouyp.justdid.ui.components.ConnectionIndicator
 import com.zhouyp.justdid.ui.qrcode.CustomScannerActivity
 import java.time.LocalDate
 import java.time.YearMonth
+
+private sealed interface PendingClear {
+    val message: String
+
+    data object SelectedDates : PendingClear {
+        override val message = "确定清理所选日期的日报数据？"
+    }
+
+    data class TimeRange(val label: String, val cutoff: LocalDate) : PendingClear {
+        override val message = "确定清除${label}以前的数据？"
+    }
+}
 
 @Composable
 fun SettingsScreen(
@@ -75,6 +92,8 @@ fun SettingsScreen(
             }
         }
     }
+
+    var pendingClearDialog by remember { mutableStateOf<PendingClear?>(null) }
 
     Column(
         modifier = Modifier
@@ -124,15 +143,33 @@ fun SettingsScreen(
                 ) {
                     DropdownMenuItem(
                         text = { Text("清除一周以前") },
-                        onClick = { viewModel.toggleDropdownMenu(false) }
+                        onClick = {
+                            viewModel.toggleDropdownMenu(false)
+                            pendingClearDialog = PendingClear.TimeRange(
+                                label = "一周",
+                                cutoff = LocalDate.now().minusDays(7)
+                            )
+                        }
                     )
                     DropdownMenuItem(
                         text = { Text("清除一月以前") },
-                        onClick = { viewModel.toggleDropdownMenu(false) }
+                        onClick = {
+                            viewModel.toggleDropdownMenu(false)
+                            pendingClearDialog = PendingClear.TimeRange(
+                                label = "一月",
+                                cutoff = LocalDate.now().minusMonths(1)
+                            )
+                        }
                     )
                     DropdownMenuItem(
                         text = { Text("清除一年以前") },
-                        onClick = { viewModel.toggleDropdownMenu(false) }
+                        onClick = {
+                            viewModel.toggleDropdownMenu(false)
+                            pendingClearDialog = PendingClear.TimeRange(
+                                label = "一年",
+                                cutoff = LocalDate.now().minusYears(1)
+                            )
+                        }
                     )
                 }
             }
@@ -203,7 +240,6 @@ fun SettingsScreen(
             CalendarGrid(
                 currentMonth = uiState.currentMonth,
                 selectedDates = uiState.selectedDates,
-                mode = uiState.mode,
                 onDateClick = { date -> viewModel.selectDate(date) }
             )
         }
@@ -212,7 +248,7 @@ fun SettingsScreen(
 
         // 操作按钮
         val buttonText = when (uiState.mode) {
-            CalendarMode.CLEAR -> "清空已选"
+            CalendarMode.CLEAR -> if (uiState.isClearing) "清理中" else "清空已选"
             CalendarMode.FETCH -> when {
                 uiState.isFetching -> "拉取中"
                 !uiState.isConnected -> "拉取已选（未连接）"
@@ -221,12 +257,19 @@ fun SettingsScreen(
         }
         Button(
             onClick = {
-                if (uiState.mode == CalendarMode.FETCH) {
-                    viewModel.fetchSelected()
+                when (uiState.mode) {
+                    CalendarMode.FETCH -> viewModel.fetchSelected()
+                    CalendarMode.CLEAR -> {
+                        if (uiState.selectedDates.isEmpty()) {
+                            viewModel.clearSelected()
+                        } else {
+                            pendingClearDialog = PendingClear.SelectedDates
+                        }
+                    }
                 }
             },
             enabled = when (uiState.mode) {
-                CalendarMode.CLEAR -> true
+                CalendarMode.CLEAR -> !uiState.isClearing
                 CalendarMode.FETCH -> uiState.isConnected && !uiState.isFetching
             },
             modifier = Modifier
@@ -244,6 +287,32 @@ fun SettingsScreen(
                 fontWeight = FontWeight.Bold
             )
         }
+    }
+
+    pendingClearDialog?.let { pending ->
+        AlertDialog(
+            onDismissRequest = { pendingClearDialog = null },
+            title = { Text("清理确认") },
+            text = { Text(pending.message) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingClearDialog = null
+                        when (pending) {
+                            PendingClear.SelectedDates -> viewModel.clearSelected()
+                            is PendingClear.TimeRange -> viewModel.clearBefore(pending.cutoff)
+                        }
+                    }
+                ) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingClearDialog = null }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 }
 

@@ -27,7 +27,8 @@ data class SettingsUiState(
     val currentMonth: YearMonth = YearMonth.now(),
     val storageUsedPercent: Float = 35f,
     val showDropdownMenu: Boolean = false,
-    val isFetching: Boolean = false
+    val isFetching: Boolean = false,
+    val isClearing: Boolean = false
 )
 
 sealed interface SettingsUiEvent {
@@ -62,15 +63,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun toggleMode(mode: CalendarMode) {
-        val current = _uiState.value
-        val today = LocalDate.now()
-        val dates = if (mode == CalendarMode.FETCH) {
-            // 拉取模式下未来日期不可选，切换时移除已选的未来日期
-            current.selectedDates.filterNot { it.isAfter(today) }.toSet()
-        } else {
-            current.selectedDates
-        }
-        _uiState.value = current.copy(mode = mode, selectedDates = dates)
+        _uiState.value = _uiState.value.copy(mode = mode)
     }
 
     fun selectDate(date: LocalDate) {
@@ -130,13 +123,48 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun clearSelected() {
+        if (_uiState.value.isClearing) return
+        val dates = _uiState.value.selectedDates.sorted()
+        if (dates.isEmpty()) {
+            viewModelScope.launch {
+                _settingsUiEvents.emit(SettingsUiEvent.Toast("请先选择日期"))
+            }
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(isClearing = true)
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                dailyReportRepository.clear(dates)
+                _settingsUiEvents.emit(SettingsUiEvent.Toast("清理成功"))
+                _uiState.value = _uiState.value.copy(selectedDates = emptySet())
+            } finally {
+                _uiState.value = _uiState.value.copy(isClearing = false)
+            }
+        }
+    }
+
+    fun clearBefore(cutoff: LocalDate) {
+        if (_uiState.value.isClearing) return
+        _uiState.value = _uiState.value.copy(isClearing = true)
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                dailyReportRepository.clearBefore(cutoff)
+                _settingsUiEvents.emit(SettingsUiEvent.Toast("清理成功"))
+            } finally {
+                _uiState.value = _uiState.value.copy(isClearing = false)
+            }
+        }
+    }
+
     fun toggleSelectAllInMonth() {
         val current = _uiState.value
         val month = current.currentMonth
         val today = LocalDate.now()
         val allDatesInMonth = (1..month.lengthOfMonth())
             .map { month.atDay(it) }
-            .filter { current.mode != CalendarMode.FETCH || !it.isAfter(today) }
+            .filter { !it.isAfter(today) }
             .toSet()
         val selectedInMonth = current.selectedDates intersect allDatesInMonth
 

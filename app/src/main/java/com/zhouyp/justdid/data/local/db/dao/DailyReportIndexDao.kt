@@ -16,4 +16,7 @@ interface DailyReportIndexDao {
 
     @Query("SELECT * FROM mobile_daliy_report_index ORDER BY year, month, day")
     suspend fun getAll(): List<MobileDailyReportIndexEntity>
+
+    @Query("DELETE FROM mobile_daliy_report_index WHERE year = :year AND month = :month AND day = :day")
+    suspend fun deleteByDate(year: Int, month: Int, day: Int)
 }

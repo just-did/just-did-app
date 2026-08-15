@@ -28,7 +28,6 @@ import java.time.YearMonth
 fun CalendarGrid(
     currentMonth: YearMonth,
     selectedDates: Set<LocalDate>,
-    mode: CalendarMode,
     onDateClick: (LocalDate) -> Unit
 ) {
     val firstOfMonth = currentMonth.atDay(1)
@@ -60,7 +59,7 @@ fun CalendarGrid(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 for (date in row) {
-                    val isFutureDisabled = mode == CalendarMode.FETCH && date > today
+                    val isFutureDisabled = date > today
                     Box(
                         modifier = Modifier
                             .weight(1f)
