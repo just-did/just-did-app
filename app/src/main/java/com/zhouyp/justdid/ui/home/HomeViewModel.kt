@@ -168,13 +168,34 @@ class HomeViewModel @Inject constructor(
             val state = _uiState.value
             if (state.anchorDate == date) return@launch
 
-            val windowStart = date.minusDays(5)
-            val windowEnd = date.plusDays(5)
-            _uiState.value = state.copy(
-                anchorDate = date,
-                displays = state.displays.filterKeys { it in windowStart..windowEnd }
-            ).withRows()
+            // 滚动中只更新锚点与加载，不做窗口淘汰（避免滚动中重建上方行导致视口跳变）
+            _uiState.value = state.copy(anchorDate = date)
             loadDisplay(date)
+        }
+    }
+
+    fun prefetch(direction: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val state = _uiState.value
+            val anchor = state.anchorDate ?: state.contentDates.firstOrNull() ?: return@launch
+            val index = state.contentDates.indexOf(anchor)
+            val target = state.contentDates.getOrNull(index + direction) ?: return@launch
+            loadDisplay(target)
+        }
+    }
+
+    fun evictWindow(visibleDates: Set<LocalDate>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val state = _uiState.value
+            val anchor = state.anchorDate ?: return@launch
+            val windowStart = anchor.minusDays(5)
+            val windowEnd = anchor.plusDays(5)
+            val filtered = state.displays.filterKeys {
+                it in visibleDates || (it in windowStart..windowEnd)
+            }
+            if (filtered.size != state.displays.size) {
+                _uiState.value = state.copy(displays = filtered).withRows()
+            }
         }
     }
 

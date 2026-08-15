@@ -2,6 +2,7 @@ package com.zhouyp.justdid.ui.home
 
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,6 +19,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -102,15 +105,34 @@ fun HomeScreen(
         }
     }
 
-    // 滚动锚点上报（窗口缓存中心）；仅在用户滚动时触发，初始锚点由 ViewModel 定为今天
+    // 滚动锚点上报（窗口缓存中心）；仅在用户滚动时触发，初始锚点由 ViewModel 定为今天；
+    // 日期与索引在 snapshotFlow 内原子捕获；按视口行进方向预取前方相邻日期
     LaunchedEffect(listState) {
+        var previousIndex: Int? = null
         snapshotFlow {
-            listState.firstVisibleItemIndex to listState.isScrollInProgress
+            val index = listState.firstVisibleItemIndex
+            val scrolling = listState.isScrollInProgress
+            Triple(index, scrolling, uiState.displayRows.getOrNull(index)?.date)
         }
             .distinctUntilChanged()
-            .collect { (index, scrolling) ->
-                if (scrolling) {
-                    uiState.displayRows.getOrNull(index)?.let { viewModel.onAnchorChanged(it.date) }
+            .collect { (index, scrolling, date) ->
+                when {
+                    scrolling -> {
+                        date?.let { viewModel.onAnchorChanged(it) }
+                        val prev = previousIndex
+                        if (prev != null && index != prev) {
+                            // 索引增大=向更早方向行进（预取更早），索引减小=向今天方向行进（预取更新）
+                            viewModel.prefetch(if (index > prev) 1 else -1)
+                        }
+                        previousIndex = index
+                    }
+                    else -> {
+                        // 滚动停止：仅淘汰不可见且超出窗口的日期，避免可见行被重建导致视口跳变
+                        val visibleDates = listState.layoutInfo.visibleItemsInfo
+                            .mapNotNull { info -> uiState.displayRows.getOrNull(info.index)?.date }
+                            .toSet()
+                        viewModel.evictWindow(visibleDates)
+                    }
                 }
             }
     }
@@ -328,12 +350,18 @@ private fun PlaceholderItem(row: DisplayRow.Placeholder, modifier: Modifier = Mo
             color = Color.Gray,
             modifier = Modifier.padding(top = 8.dp)
         )
-        Text(
-            text = "加载中…",
-            fontSize = 13.sp,
-            color = Color.LightGray,
-            modifier = Modifier.padding(top = 4.dp)
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp,
+                color = Color.Gray
+            )
+        }
     }
 }
 

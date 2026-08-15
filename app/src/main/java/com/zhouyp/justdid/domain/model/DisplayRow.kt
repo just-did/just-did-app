@@ -14,7 +14,8 @@ sealed interface DisplayRow {
     }
 
     data class Placeholder(override val date: LocalDate) : DisplayRow {
-        override val key: String get() = "p:$date"
+        // 与 DayHeader 同 key：内容加载替换占位时，滚动锚定无缝转移到日期头，避免视口跳变
+        override val key: String get() = "h:$date"
     }
 
     data class TimeHeader(
