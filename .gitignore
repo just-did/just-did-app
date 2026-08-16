@@ -28,10 +28,18 @@ Thumbs.db
 *.swo
 *~
 
+# --- 构建输出 ---
+dist/
+.kotlin/
+
 # --- Local configuration ---
 local.properties
 *.env
 *.env.local
+
+# --- 签名密钥（勿提交） ---
+keystore/
+app/keystore.properties
 
 # --- Claude Code ---
 .claude
