@@ -102,6 +102,8 @@ keyPassword=<你的密码>
 
 产物输出到 `dist/`（debug + release 两个 APK）。未配置 `keystore.properties` 时 release 为未签名 APK。
 
+发布 GitHub Release 时，请把 APK 的 SHA-256 校验值附在 Release 说明里（`sha256sum dist/just-did-v<versionName>-release.apk`），并同步更新门户下载页 `just-did.github.io/download.html` 手机端卡片的版本号与校验值。
+
 ## HTTP API
 
 4 个 REST 接口均通过局域网访问（电脑端主界面显示二维码，手机端扫码获取地址），协议与电脑端一一对应：
