@@ -11,7 +11,6 @@ composeBom = "2026.02.01"
 ksp = "2.0.21-1.0.28"
 hilt = "2.60"
 hiltNavigationCompose = "1.2.0"
-retrofit = "2.11.0"
 okhttp = "4.12.0"
 gson = "2.11.0"
 room = "2.7.0"
@@ -46,10 +45,7 @@ hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.r
 hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 
 # Network
-retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
-retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
-okhttp-logging-interceptor = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 
 # Room

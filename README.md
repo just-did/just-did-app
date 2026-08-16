@@ -57,7 +57,7 @@
 | Jetpack Compose + Material3 | UI |
 | Hilt | 依赖注入 |
 | Room + DataStore | 日报索引与连接配置 |
-| OkHttp / Retrofit / Gson | 网络请求（电脑端地址动态获取） |
+| OkHttp / Gson | 网络请求（电脑端地址动态获取） |
 | ZXing（journeyapps 移植版） | 二维码扫描 |
 
 ## 构建
