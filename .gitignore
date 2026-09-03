@@ -53,3 +53,6 @@ AGENTS.md
 openspec
 
 doc/*
+
+# --- 代码审查报告 ---
+review-report/
