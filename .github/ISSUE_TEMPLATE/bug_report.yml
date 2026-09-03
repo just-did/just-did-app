@@ -1,0 +1,62 @@
+name: Bug 报告
+description: 报告一个可以复现的缺陷
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢报告问题。请尽量完整填写以下信息，便于快速定位和复现。
+        提交日志或截图前，请先移除电脑地址、日报内容等敏感信息。
+  - type: textarea
+    id: desc
+    attributes:
+      label: 问题描述
+      description: 发生了什么？预期应该是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开应用...
+        2. 点击...
+        3. 观察到...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或截图（可选）
+      description: 请粘贴相关 Logcat 片段或拖入截图，并先移除电脑地址、日报内容等敏感信息。
+  - type: input
+    id: android
+    attributes:
+      label: Android 版本
+      description: 例如 Android 16。
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: 设备型号
+      description: 例如 Xiaomi 15。
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: 应用版本 / 安装方式
+      description: 例如 v1.0 Release APK、Debug APK 或自行构建。
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 自查
+      options:
+        - label: 已确认问题可以稳定复现
+          required: true
+        - label: 已搜索并确认没有相同的 Issue
+          required: true
