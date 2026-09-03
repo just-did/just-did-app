@@ -3,6 +3,7 @@ package com.zhouyp.justdid.data.repository
 import android.content.Context
 import com.zhouyp.justdid.data.local.db.dao.DailyReportIndexDao
 import com.zhouyp.justdid.data.local.file.FileStorageManager
+import com.zhouyp.justdid.domain.RecordContentRules
 import com.zhouyp.justdid.domain.model.DailyDisplay
 import com.zhouyp.justdid.domain.model.RecordGroup
 import com.zhouyp.justdid.domain.model.RecordSource
@@ -46,20 +47,21 @@ class HomeRepositoryImpl @Inject constructor(
         withContext(Dispatchers.IO) {
             val timeStr = LocalDateTime.now()
                 .format(DateTimeFormatter.ofPattern("HH:mm"))
+            val fileExists = stagingFileForToday.exists()
+            val lastTime = if (fileExists) findLastTime() else null
+            val toWrite = RecordContentRules.formatForAppend(
+                content = content,
+                currentTime = timeStr,
+                lastTime = lastTime,
+                fileExists = fileExists
+            )
 
-            if (!stagingFileForToday.exists()) {
-                fileStorageManager.saveText(stagingFileForToday, "$timeStr\n$content")
+            if (!fileExists) {
+                fileStorageManager.saveText(stagingFileForToday, toWrite)
                 return@withContext
             }
 
-            val lastTime = findLastTime()
-
-            val toAppend = when {
-                lastTime != timeStr -> "\n\n$timeStr\n$content"
-                else -> "\n$content"
-            }
-
-            fileStorageManager.appendText(stagingFileForToday, toAppend)
+            fileStorageManager.appendText(stagingFileForToday, toWrite)
         }
     }
 

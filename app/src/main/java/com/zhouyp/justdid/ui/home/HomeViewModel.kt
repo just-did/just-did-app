@@ -9,6 +9,7 @@ import com.zhouyp.justdid.domain.model.DisplayRow
 import com.zhouyp.justdid.domain.model.FetchResult
 import com.zhouyp.justdid.domain.model.PushResult
 import com.zhouyp.justdid.domain.model.UpdatedIndexEntry
+import com.zhouyp.justdid.domain.RecordContentRules
 import com.zhouyp.justdid.domain.repository.ConnectionRepository
 import com.zhouyp.justdid.domain.repository.DailyReportRepository
 import com.zhouyp.justdid.domain.repository.HomeRepository
@@ -31,7 +32,8 @@ data class HomeUiState(
     val displays: Map<LocalDate, DailyDisplay> = emptyMap(),
     val displayRows: List<DisplayRow> = emptyList(),
     val anchorDate: LocalDate? = null,
-    val scrollToTodayTick: Int = 0
+    val scrollToTodayTick: Int = 0,
+    val historyLoadingIndicatorEnabled: Boolean = false
 )
 
 sealed interface PushUiEvent {
@@ -51,7 +53,7 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState
 
-    private val _pushUiEvents = MutableSharedFlow<PushUiEvent>()
+    private val _pushUiEvents = MutableSharedFlow<PushUiEvent>(extraBufferCapacity = 1)
     val pushUiEvents: SharedFlow<PushUiEvent> = _pushUiEvents
 
     private var fullDates: List<LocalDate> = emptyList()
@@ -78,6 +80,10 @@ class HomeViewModel @Inject constructor(
     }
 
     fun onInputTextChange(text: String) {
+        if (RecordContentRules.hasConsecutiveLineBreaks(text)) {
+            _pushUiEvents.tryEmit(PushUiEvent.Toast("不支持连续换行"))
+            return
+        }
         _uiState.value = _uiState.value.copy(inputText = text)
     }
 
@@ -95,7 +101,8 @@ class HomeViewModel @Inject constructor(
                 contentDates = allDatesDesc(),
                 displays = mapOf(today to display),
                 anchorDate = today,
-                scrollToTodayTick = _uiState.value.scrollToTodayTick + 1
+                scrollToTodayTick = _uiState.value.scrollToTodayTick + 1,
+                historyLoadingIndicatorEnabled = false
             ).withRows()
         }
     }
@@ -185,6 +192,13 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun onHistoryNavigationStarted() {
+        val state = _uiState.value
+        if (!state.historyLoadingIndicatorEnabled) {
+            _uiState.value = state.copy(historyLoadingIndicatorEnabled = true)
+        }
+    }
+
     fun evictWindow(visibleDates: Set<LocalDate>) {
         viewModelScope.launch(Dispatchers.IO) {
             val state = _uiState.value
@@ -260,7 +274,8 @@ class HomeViewModel @Inject constructor(
                     state.scrollToTodayTick
                 } else {
                     state.scrollToTodayTick + 1
-                }
+                },
+                historyLoadingIndicatorEnabled = false
             ).withRows()
         }
     }

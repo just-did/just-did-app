@@ -45,6 +45,10 @@ app/keystore.properties
 .claude
 CLAUDE.md
 
+# --- codex ---
+.agents
+AGENTS.md
+
 # --- OpenSpec ---
 openspec
 

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -42,6 +43,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +63,12 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 private data class DiscardPrompt(val batchId: String, val message: String)
+private data class ScrollSnapshot(
+    val index: Int,
+    val scrolling: Boolean,
+    val userDragging: Boolean,
+    val date: LocalDate?
+)
 
 @Composable
 fun HomeScreen(
@@ -97,6 +106,17 @@ fun HomeScreen(
     }
 
     val listState = rememberLazyListState()
+    var userDragging by remember { mutableStateOf(false) }
+
+    LaunchedEffect(listState.interactionSource) {
+        listState.interactionSource.interactions.collect { interaction ->
+            when (interaction) {
+                is DragInteraction.Start -> userDragging = true
+                is DragInteraction.Stop, is DragInteraction.Cancel -> userDragging = false
+                else -> Unit
+            }
+        }
+    }
 
     // 记录后（或当前阅读日期消失后）跳回今天（reverseLayout 下索引 0 即底部=今天）
     LaunchedEffect(uiState.scrollToTodayTick) {
@@ -112,17 +132,26 @@ fun HomeScreen(
         snapshotFlow {
             val index = listState.firstVisibleItemIndex
             val scrolling = listState.isScrollInProgress
-            Triple(index, scrolling, uiState.displayRows.getOrNull(index)?.date)
+            ScrollSnapshot(
+                index = index,
+                scrolling = scrolling,
+                userDragging = userDragging,
+                date = uiState.displayRows.getOrNull(index)?.date
+            )
         }
             .distinctUntilChanged()
-            .collect { (index, scrolling, date) ->
+            .collect { (index, scrolling, dragging, date) ->
                 when {
                     scrolling -> {
                         date?.let { viewModel.onAnchorChanged(it) }
                         val prev = previousIndex
                         if (prev != null && index != prev) {
                             // 索引增大=向更早方向行进（预取更早），索引减小=向今天方向行进（预取更新）
-                            viewModel.prefetch(if (index > prev) 1 else -1)
+                            val direction = if (index > prev) 1 else -1
+                            if (dragging && direction == 1) {
+                                viewModel.onHistoryNavigationStarted()
+                            }
+                            viewModel.prefetch(direction)
                         }
                         previousIndex = index
                     }
@@ -207,7 +236,11 @@ fun HomeScreen(
                 when (row) {
                     is DisplayRow.DayHeader -> DayHeaderItem(row)
                     is DisplayRow.Placeholder ->
-                        PlaceholderItem(row, modifier = Modifier.fillParentMaxHeight())
+                        PlaceholderItem(
+                            row = row,
+                            showLoadingIndicator = uiState.historyLoadingIndicatorEnabled,
+                            modifier = Modifier.fillParentMaxHeight()
+                        )
                     is DisplayRow.TimeHeader -> TimeHeaderItem(row)
                     is DisplayRow.ContentLine -> ContentLineItem(row)
                 }
@@ -341,7 +374,11 @@ private fun DayHeaderItem(row: DisplayRow.DayHeader) {
 }
 
 @Composable
-private fun PlaceholderItem(row: DisplayRow.Placeholder, modifier: Modifier = Modifier) {
+internal fun PlaceholderItem(
+    row: DisplayRow.Placeholder,
+    showLoadingIndicator: Boolean,
+    modifier: Modifier = Modifier
+) {
     Column(modifier = modifier) {
         Text(
             text = dayHeaderText(row.date),
@@ -356,11 +393,15 @@ private fun PlaceholderItem(row: DisplayRow.Placeholder, modifier: Modifier = Mo
                 .weight(1f),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                strokeWidth = 2.dp,
-                color = Color.Gray
-            )
+            if (showLoadingIndicator) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .semantics { contentDescription = "正在加载历史日报" },
+                    strokeWidth = 2.dp,
+                    color = Color.Gray
+                )
+            }
         }
     }
 }
