@@ -5,12 +5,14 @@ import com.zhouyp.justdid.data.repository.DailyReportRepositoryImpl
 import com.zhouyp.justdid.data.repository.HomeRepositoryImpl
 import com.zhouyp.justdid.data.repository.ConnectionRepositoryImpl
 import com.zhouyp.justdid.data.repository.PushRepositoryImpl
+import com.zhouyp.justdid.data.repository.PrivacyConsentRepositoryImpl
 import com.zhouyp.justdid.data.repository.SettingsRepositoryImpl
 import com.zhouyp.justdid.domain.repository.ConfigRepository
 import com.zhouyp.justdid.domain.repository.ConnectionRepository
 import com.zhouyp.justdid.domain.repository.DailyReportRepository
 import com.zhouyp.justdid.domain.repository.HomeRepository
 import com.zhouyp.justdid.domain.repository.PushRepository
+import com.zhouyp.justdid.domain.repository.PrivacyConsentRepository
 import com.zhouyp.justdid.domain.repository.SettingsRepository
 import dagger.Binds
 import dagger.Module
@@ -38,4 +40,9 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindConfigRepository(impl: ConfigRepositoryImpl): ConfigRepository
+
+    @Binds
+    abstract fun bindPrivacyConsentRepository(
+        impl: PrivacyConsentRepositoryImpl
+    ): PrivacyConsentRepository
 }

@@ -10,6 +10,7 @@ import com.zhouyp.justdid.domain.model.FetchResult
 import com.zhouyp.justdid.domain.repository.ConfigRepository
 import com.zhouyp.justdid.domain.repository.ConnectionRepository
 import com.zhouyp.justdid.domain.repository.DailyReportRepository
+import com.zhouyp.justdid.domain.repository.PrivacyConsentRepository
 import com.zhouyp.justdid.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +47,8 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val connectionRepository: ConnectionRepository,
     private val dailyReportRepository: DailyReportRepository,
-    private val configRepository: ConfigRepository
+    private val configRepository: ConfigRepository,
+    private val privacyConsentRepository: PrivacyConsentRepository
 ) : ViewModel(), DefaultLifecycleObserver {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -118,6 +120,13 @@ class SettingsViewModel @Inject constructor(
 
     fun toggleDropdownMenu(show: Boolean) {
         _uiState.value = _uiState.value.copy(showDropdownMenu = show)
+    }
+
+    fun withdrawPrivacyConsent() {
+        connectionRepository.stopPolling()
+        viewModelScope.launch(Dispatchers.IO) {
+            privacyConsentRepository.withdrawConsent()
+        }
     }
 
     fun fetchSelected() {

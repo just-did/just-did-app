@@ -56,6 +56,7 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import com.zhouyp.justdid.ui.components.ConnectionIndicator
 import com.zhouyp.justdid.ui.qrcode.CustomScannerActivity
+import com.zhouyp.justdid.ui.privacy.PrivacyPolicyDialog
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -96,6 +97,8 @@ fun SettingsScreen(
     }
 
     var pendingClearDialog by remember { mutableStateOf<PendingClear?>(null) }
+    var showWithdrawDialog by remember { mutableStateOf(false) }
+    var showPrivacyPolicy by remember { mutableStateOf(false) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(viewModel, lifecycleOwner) {
@@ -177,6 +180,20 @@ fun SettingsScreen(
                                 label = "一年",
                                 cutoff = LocalDate.now().minusYears(1)
                             )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("隐私政策") },
+                        onClick = {
+                            viewModel.toggleDropdownMenu(false)
+                            showPrivacyPolicy = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("撤回隐私同意") },
+                        onClick = {
+                            viewModel.toggleDropdownMenu(false)
+                            showWithdrawDialog = true
                         }
                     )
                 }
@@ -326,6 +343,36 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+    if (showWithdrawDialog) {
+        AlertDialog(
+            onDismissRequest = { showWithdrawDialog = false },
+            title = { Text("撤回隐私同意") },
+            text = {
+                Text(
+                    "撤回后，应用将停止提供记录与同步等核心功能。" +
+                        "此前保存的本地日报和电脑端连接地址不会自动删除。"
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showWithdrawDialog = false
+                        viewModel.withdrawPrivacyConsent()
+                    }
+                ) {
+                    Text("确认撤回")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWithdrawDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+    if (showPrivacyPolicy) {
+        PrivacyPolicyDialog(onDismiss = { showPrivacyPolicy = false })
     }
 }
 

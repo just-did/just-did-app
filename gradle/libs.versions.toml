@@ -7,6 +7,7 @@ espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.11.0"
 activityCompose = "1.13.0"
 kotlin = "2.0.21"
+kotlinxCoroutines = "1.10.2"
 composeBom = "2026.02.01"
 ksp = "2.0.21-1.0.28"
 hilt = "2.60"
@@ -61,6 +62,7 @@ zxing-android-embedded = { group = "com.journeyapps", name = "zxing-android-embe
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 
