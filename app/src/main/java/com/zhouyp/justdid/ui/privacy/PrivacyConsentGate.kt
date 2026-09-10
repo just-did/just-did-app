@@ -4,11 +4,11 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -20,13 +20,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun PrivacyConsentGate(
     viewModel: PrivacyConsentViewModel = hiltViewModel(),
+    onDecline: () -> Unit,
     acceptedContent: @Composable () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -38,12 +38,8 @@ fun PrivacyConsentGate(
         PrivacyConsentUiState.Loading -> LoadingScreen()
         PrivacyConsentUiState.Required -> PrivacyConsentDialog(
             onViewPolicy = openPolicy,
-            onDecline = viewModel::decline,
+            onDecline = onDecline,
             onAccept = viewModel::accept
-        )
-        PrivacyConsentUiState.Declined -> DeclinedScreen(
-            onViewPolicy = openPolicy,
-            onChooseAgain = viewModel::chooseAgain
         )
         PrivacyConsentUiState.Accepted -> acceptedContent()
     }
@@ -73,12 +69,12 @@ internal fun PrivacyConsentDialog(
         onDismissRequest = {},
         title = { Text("欢迎使用 JustDid") },
         text = {
-            Column {
-                Text("感谢您使用 JustDid。我们重视并保护您的个人信息和隐私安全。")
-                Text(
-                    text = "在使用前，请阅读并充分理解《隐私政策》，了解我们如何处理您记录的工作内容，以及通过局域网与电脑端同步数据。",
-                    modifier = Modifier.padding(top = 12.dp)
-                )
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(LOCAL_PRIVACY_SUMMARY)
                 TextButton(onClick = onViewPolicy) {
                     Text("《隐私政策》", fontWeight = FontWeight.Bold)
                 }
@@ -91,37 +87,8 @@ internal fun PrivacyConsentDialog(
         },
         dismissButton = {
             TextButton(onClick = onDecline) {
-                Text("不同意")
+                Text("不同意并退出")
             }
         }
     )
-}
-
-@Composable
-internal fun DeclinedScreen(
-    onViewPolicy: () -> Unit,
-    onChooseAgain: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "您尚未同意隐私政策，因此暂时无法使用 JustDid。您可以阅读隐私政策后重新选择。",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
-        )
-        TextButton(
-            onClick = onViewPolicy,
-            modifier = Modifier.padding(top = 16.dp)
-        ) {
-            Text("查看隐私政策")
-        }
-        Button(onClick = onChooseAgain) {
-            Text("重新选择")
-        }
-    }
 }

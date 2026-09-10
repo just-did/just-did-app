@@ -28,7 +28,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             JustDidTheme {
                 var cacheUsageRefreshed by remember { mutableStateOf(false) }
-                PrivacyConsentGate {
+                PrivacyConsentGate(
+                    onDecline = { finishAndRemoveTask() }
+                ) {
                     LaunchedEffect(Unit) {
                         if (!cacheUsageRefreshed) {
                             cacheUsageRefreshed = true

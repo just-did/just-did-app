@@ -13,7 +13,6 @@ import kotlinx.coroutines.launch
 sealed interface PrivacyConsentUiState {
     data object Loading : PrivacyConsentUiState
     data object Required : PrivacyConsentUiState
-    data object Declined : PrivacyConsentUiState
     data object Accepted : PrivacyConsentUiState
 }
 
@@ -40,13 +39,5 @@ class PrivacyConsentViewModel @Inject constructor(
         viewModelScope.launch {
             privacyConsentRepository.acceptCurrentPolicy()
         }
-    }
-
-    fun decline() {
-        _uiState.value = PrivacyConsentUiState.Declined
-    }
-
-    fun chooseAgain() {
-        _uiState.value = PrivacyConsentUiState.Required
     }
 }
